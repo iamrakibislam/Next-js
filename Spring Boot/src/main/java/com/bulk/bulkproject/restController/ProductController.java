@@ -70,4 +70,32 @@ public class ProductController {
             return ResponseEntity.internalServerError().body("❌ Error deleting product: " + e.getMessage());
         }
     }
+
+    // ========== EDIT/UPDATE PRODUCT ========== //
+    @PostMapping(value = "/edit/{folder}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> editProduct(
+            @PathVariable("folder") String folderName,
+            @RequestPart("data") String productDataJson,
+            @RequestPart(value = "image", required = false) MultipartFile image
+    ) {
+        try {
+            // Convert JSON to ProductRequest
+            ObjectMapper mapper = new ObjectMapper();
+            ProductRequest updatedData = mapper.readValue(productDataJson, ProductRequest.class);
+
+            // Call service to update
+            boolean success = productService.editProduct(folderName, updatedData, image);
+
+            if (!success) {
+                return ResponseEntity.badRequest().body("❌ Product folder not found: " + folderName);
+            }
+
+            return ResponseEntity.ok("✔ Product updated successfully: " + folderName);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("❌ Error updating product: " + e.getMessage());
+        }
+    }
+
 }

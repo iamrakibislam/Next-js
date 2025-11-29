@@ -113,4 +113,46 @@ public class ProductService {
         }
         directory.delete();
     }
+
+    public boolean editProduct(String folderName, ProductRequest updatedData, MultipartFile newImage) throws Exception {
+        File root = new File(storagePath);
+        File productDir = new File(root, folderName);
+
+        if (!productDir.exists()) return false;
+
+        // Load existing product.json
+        File jsonFile = new File(productDir, "product.json");
+        Map<String, Object> productMap = jsonFile.exists()
+                ? mapper.readValue(jsonFile, Map.class)
+                : new HashMap<>();
+
+        // Update fields
+        productMap.put("name", updatedData.getName());
+        productMap.put("description", updatedData.getDescription());
+        productMap.put("price", updatedData.getPrice());
+
+        // Replace image if new one provided
+        if (newImage != null && !newImage.isEmpty()) {
+            // Delete old image
+            String oldImageName = (String) productMap.get("imageUrl");
+            if (oldImageName != null) {
+                File oldImageFile = new File(root, oldImageName);
+                if (oldImageFile.exists()) oldImageFile.delete();
+            }
+
+            // Save new image
+            String newImageName = newImage.getOriginalFilename();
+            File imageFile = new File(productDir, newImageName);
+            newImage.transferTo(imageFile);
+
+            productMap.put("imageUrl", folderName + "/" + newImageName);
+        }
+
+        // Write updated JSON
+        mapper.writeValue(jsonFile, productMap);
+
+        System.out.println("Updated product folder: " + productDir.getAbsolutePath());
+        return true;
+    }
+
 }
