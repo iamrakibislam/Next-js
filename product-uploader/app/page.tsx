@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
 interface Product {
@@ -11,26 +11,48 @@ interface Product {
   imageUrl?: string;
 }
 
+interface Validation {
+  name: boolean;
+  price: boolean;
+  description: boolean;
+}
+
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([
     { name: "", description: "", price: 0 },
+  ]);
+  const [validation, setValidation] = useState<Validation[]>([
+    { name: true, price: true, description: true },
   ]);
   const [images, setImages] = useState<FileList | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [productList, setProductList] = useState<Product[]>([]);
   const [page, setPage] = useState(1);
-
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
-
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pageSize = 6;
 
-  const addRow = () =>
+  // ➤ ADD ROW
+  const addRow = () => {
     setProducts([...products, { name: "", description: "", price: 0 }]);
+    setValidation([...validation, { name: true, price: true, description: true }]);
+  };
+
+  // ➤ REMOVE ROW
+  const removeRow = (index: number) => {
+    if (products.length === 1) return alert("At least one product is required!");
+    const updated = [...products];
+    updated.splice(index, 1);
+    setProducts(updated);
+
+    const valUpdated = [...validation];
+    valUpdated.splice(index, 1);
+    setValidation(valUpdated);
+  };
 
   const handleChange = (index: number, field: keyof Product, value: string) => {
     const updated = [...products];
-
     switch (field) {
       case "price":
         updated[index][field] = Number(value) as Product[typeof field];
@@ -40,8 +62,12 @@ export default function Home() {
         updated[index][field] = value as Product[typeof field];
         break;
     }
-
     setProducts(updated);
+
+    // Reset validation for this field
+    const valUpdated = [...validation];
+    valUpdated[index][field] = true;
+    setValidation(valUpdated);
   };
 
   const handleImages = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,12 +79,33 @@ export default function Home() {
     if (images.length !== products.length)
       return alert("Product count and image count must match!");
 
+    // ➤ VALIDATION
+    let valid = true;
+    const valUpdated = [...validation];
+
+    products.forEach((p, i) => {
+      if (!p.name.trim()) {
+        valUpdated[i].name = false;
+        valid = false;
+      }
+      if (p.price <= 0) {
+        valUpdated[i].price = false;
+        valid = false;
+      }
+      if (!p.description.trim()) {
+        valUpdated[i].description = false;
+        valid = false;
+      }
+    });
+
+    setValidation(valUpdated);
+    if (!valid) return alert("Please fill all required fields correctly!");
+
     const formData = new FormData();
     formData.append(
       "data",
       new Blob([JSON.stringify(products)], { type: "application/json" })
     );
-
     Array.from(images).forEach((file) => formData.append("images", file));
 
     try {
@@ -68,15 +115,18 @@ export default function Home() {
       await axios.post("http://localhost:8080/api/products/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (e) => {
-          if (e.total) {
-            setUploadProgress(Math.round((e.loaded * 100) / e.total));
-          }
+          if (e.total) setUploadProgress(Math.round((e.loaded * 100) / e.total));
         },
       });
 
       alert("Upload Successful!");
+
+      // Reset
       setProducts([{ name: "", description: "", price: 0 }]);
+      setValidation([{ name: true, price: true, description: true }]);
       setImages(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+
       loadProducts();
     } catch (err) {
       console.error(err);
@@ -121,14 +171,11 @@ export default function Home() {
     loadProducts();
   }, []);
 
-  const paginated = productList.slice(
-    (page - 1) * pageSize,
-    page * pageSize
-  );
+  const paginated = productList.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="p-8 max-w-7xl mx-auto font-sans">
-      <h1 className="text-4xl md:text-5xl font-bold text-center text-gray-900 mb-12 tracking-tight">
+      <h1 className="text-4xl md:text-5xl font-bold text-center text-gray-900 mb-12">
         Bulk Product Management System
       </h1>
 
@@ -142,17 +189,28 @@ export default function Home() {
           {products.map((item, index) => (
             <div
               key={index}
-              className="p-6 bg-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition"
+              className="p-6 bg-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition relative"
             >
               <h3 className="font-semibold text-lg text-gray-700 mb-4">
                 Product {index + 1}
               </h3>
 
+              {products.length > 1 && (
+                <button
+                  onClick={() => removeRow(index)}
+                  className="absolute top-4 right-4 text-white bg-red-600 px-3 py-1 rounded-lg shadow hover:bg-red-700 transition"
+                >
+                  Remove
+                </button>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input
                   type="text"
                   placeholder="Product Name"
-                  className="border p-3 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className={`border p-3 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none ${
+                    !validation[index].name ? "border-red-500" : ""
+                  }`}
                   value={item.name}
                   onChange={(e) => handleChange(index, "name", e.target.value)}
                 />
@@ -160,14 +218,18 @@ export default function Home() {
                 <input
                   type="number"
                   placeholder="Price"
-                  className="border p-3 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className={`border p-3 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none ${
+                    !validation[index].price ? "border-red-500" : ""
+                  }`}
                   value={item.price}
                   onChange={(e) => handleChange(index, "price", e.target.value)}
                 />
 
                 <textarea
                   placeholder="Description"
-                  className="border p-3 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className={`border p-3 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none ${
+                    !validation[index].description ? "border-red-500" : ""
+                  }`}
                   value={item.description}
                   onChange={(e) =>
                     handleChange(index, "description", e.target.value)
@@ -192,7 +254,13 @@ export default function Home() {
           Upload Product Images
         </h2>
 
-        <input type="file" multiple className="mb-4" onChange={handleImages} />
+        <input
+          type="file"
+          multiple
+          className="mb-4"
+          onChange={handleImages}
+          ref={fileInputRef}
+        />
 
         {uploadProgress > 0 && (
           <div className="w-full bg-gray-200 h-3 rounded-full">
@@ -221,15 +289,13 @@ export default function Home() {
         {paginated.map((p) => (
           <div
             key={p.id}
-            className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 
-                       hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+            className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
           >
             {p.imageUrl && (
               <img
                 src={`http://localhost:8080/${p.imageUrl}`}
                 alt={p.name}
-                className="w-full h-48 object-cover rounded-xl mb-4 cursor-pointer 
-                           hover:opacity-90 transition"
+                className="w-full h-48 object-cover rounded-xl mb-4 cursor-pointer hover:opacity-90 transition"
                 onClick={() =>
                   setFullscreenImage(`http://localhost:8080/${p.imageUrl}`)
                 }
@@ -241,13 +307,10 @@ export default function Home() {
 
             <p className="mt-3 text-lg font-bold text-green-700">${p.price}</p>
 
-            <div className="mt-5 flex justify-between items-center">
-             
-
+            <div className="mt-5 flex justify-between">
               <button
                 onClick={() => handleDelete(p.imageUrl)}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg shadow 
-                           hover:bg-red-700 transition font-semibold"
+                className="bg-red-600 text-white px-4 py-2 rounded-lg shadow hover:bg-red-700 transition font-semibold"
               >
                 Delete
               </button>
