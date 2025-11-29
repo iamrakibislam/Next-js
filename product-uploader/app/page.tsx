@@ -21,13 +21,13 @@ export default function Home() {
   const [productList, setProductList] = useState<Product[]>([]);
   const [page, setPage] = useState(1);
 
-  const pageSize = 5;
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
-  // Add new product row
+  const pageSize = 6;
+
   const addRow = () =>
     setProducts([...products, { name: "", description: "", price: 0 }]);
 
-  // Type-safe handleChange
   const handleChange = (index: number, field: keyof Product, value: string) => {
     const updated = [...products];
 
@@ -39,19 +39,15 @@ export default function Home() {
       case "description":
         updated[index][field] = value as Product[typeof field];
         break;
-      default:
-        break; // ignore other fields
     }
 
     setProducts(updated);
   };
 
-  // Handle file input
   const handleImages = (e: React.ChangeEvent<HTMLInputElement>) => {
     setImages(e.target.files);
   };
 
-  // Upload products and images
   const handleUpload = async () => {
     if (!images) return alert("Please select images!");
     if (images.length !== products.length)
@@ -91,7 +87,6 @@ export default function Home() {
     }
   };
 
-  // Load all products
   const loadProducts = async () => {
     try {
       const res = await axios.get("http://localhost:8080/api/products/list");
@@ -103,7 +98,6 @@ export default function Home() {
     }
   };
 
-  // Delete product
   const handleDelete = async (imageUrl?: string) => {
     if (!imageUrl) return;
 
@@ -134,7 +128,6 @@ export default function Home() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto font-sans">
-
       <h1 className="text-4xl md:text-5xl font-bold text-center text-gray-900 mb-12 tracking-tight">
         Bulk Product Management System
       </h1>
@@ -224,33 +217,41 @@ export default function Home() {
         Uploaded Products
       </h2>
 
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {paginated.map((p) => (
           <div
             key={p.id}
-            className="flex flex-col md:flex-row justify-between items-start gap-6 bg-white p-6 rounded-2xl shadow border border-gray-200 hover:shadow-lg transition"
+            className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 
+                       hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
           >
-            <div className="space-y-1">
-              <p><span className="font-semibold">ID:</span> {p.id}</p>
-              <p><span className="font-semibold">Name:</span> {p.name}</p>
-              <p><span className="font-semibold">Description:</span> {p.description}</p>
-              <p><span className="font-semibold">Price:</span> ${p.price}</p>
+            {p.imageUrl && (
+              <img
+                src={`http://localhost:8080/${p.imageUrl}`}
+                alt={p.name}
+                className="w-full h-48 object-cover rounded-xl mb-4 cursor-pointer 
+                           hover:opacity-90 transition"
+                onClick={() =>
+                  setFullscreenImage(`http://localhost:8080/${p.imageUrl}`)
+                }
+              />
+            )}
 
-              {p.imageUrl && (
-                <img
-                  src={`http://localhost:8080/${p.imageUrl}`}
-                  alt={p.name}
-                  className="mt-3 max-h-44 rounded-xl border shadow"
-                />
-              )}
+            <h3 className="text-xl font-semibold text-gray-800">{p.name}</h3>
+            <p className="text-gray-600 text-sm mt-1">{p.description}</p>
+
+            <p className="mt-3 text-lg font-bold text-green-700">${p.price}</p>
+
+            <div className="mt-5 flex justify-between items-center">
+             
+
+              <button
+                onClick={() => handleDelete(p.imageUrl)}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg shadow 
+                           hover:bg-red-700 transition font-semibold"
+              >
+                Delete
+              </button>
             </div>
-
-            <button
-              onClick={() => handleDelete(p.imageUrl)}
-              className="bg-red-600 text-white px-5 py-2 rounded-lg shadow hover:bg-red-700 transition font-semibold"
-            >
-              Delete
-            </button>
           </div>
         ))}
       </div>
@@ -273,6 +274,19 @@ export default function Home() {
           Next
         </button>
       </div>
+
+      {/* FULLSCREEN IMAGE VIEWER */}
+      {fullscreenImage && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[9999]"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <img
+            src={fullscreenImage}
+            className="max-w-[90%] max-h-[90%] rounded-xl shadow-2xl animate-[zoomIn_0.3s_ease]"
+          />
+        </div>
+      )}
     </div>
   );
 }
