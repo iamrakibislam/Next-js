@@ -115,44 +115,47 @@ public class ProductService {
     }
 
     public boolean editProduct(String folderName, ProductRequest updatedData, MultipartFile newImage) throws Exception {
+
         File root = new File(storagePath);
         File productDir = new File(root, folderName);
 
         if (!productDir.exists()) return false;
 
-        // Load existing product.json
+        // Load existing JSON
         File jsonFile = new File(productDir, "product.json");
-        Map<String, Object> productMap = jsonFile.exists()
-                ? mapper.readValue(jsonFile, Map.class)
-                : new HashMap<>();
+        Map<String, Object> productMap = mapper.readValue(jsonFile, Map.class);
 
         // Update fields
         productMap.put("name", updatedData.getName());
         productMap.put("description", updatedData.getDescription());
         productMap.put("price", updatedData.getPrice());
 
-        // Replace image if new one provided
+        // Replace image if new image provided
         if (newImage != null && !newImage.isEmpty()) {
+
             // Delete old image
-            String oldImageName = (String) productMap.get("imageUrl");
-            if (oldImageName != null) {
-                File oldImageFile = new File(root, oldImageName);
+            String oldImageUrl = (String) productMap.get("imageUrl");
+            if (oldImageUrl != null) {
+                // Extract image file name
+                String oldImageName = oldImageUrl.replace(folderName + "/", "");
+                File oldImageFile = new File(productDir, oldImageName);
                 if (oldImageFile.exists()) oldImageFile.delete();
             }
 
             // Save new image
             String newImageName = newImage.getOriginalFilename();
-            File imageFile = new File(productDir, newImageName);
-            newImage.transferTo(imageFile);
+            File newImageFile = new File(productDir, newImageName);
+            newImage.transferTo(newImageFile);
 
+            // Update imageUrl in JSON
             productMap.put("imageUrl", folderName + "/" + newImageName);
         }
 
-        // Write updated JSON
+        // Save updated JSON
         mapper.writeValue(jsonFile, productMap);
 
-        System.out.println("Updated product folder: " + productDir.getAbsolutePath());
         return true;
     }
+
 
 }
