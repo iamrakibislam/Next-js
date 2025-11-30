@@ -39,11 +39,11 @@ public class ProductService {
 
             if (duplicateFound) {
                 throw new RuntimeException(
-                        "❌ Duplicate product found: " + data.getName() + " (" + data.getDescription() + ")"
+                        " Duplicate product found: " + data.getName() + " (" + data.getDescription() + ")"
                 );
             }
             // ------------------------------
-            // 🔥 DUPLICATE CHECK END
+            //  DUPLICATE CHECK END
             // ------------------------------
 
             MultipartFile image = images.get(i);

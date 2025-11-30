@@ -8,7 +8,7 @@ public class ProductRequest {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;  // <- change here
+    private Integer id;
 
     private String name;
     private String description;

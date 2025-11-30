@@ -40,7 +40,7 @@ public class ProductController {
         } catch (RuntimeException dupEx) {
             return ResponseEntity.badRequest().body(dupEx.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("❌ Error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(" Error: " + e.getMessage());
         }
     }
 
@@ -58,13 +58,13 @@ public class ProductController {
             boolean deleted = productService.deleteProduct(folderName);
 
             if (!deleted) {
-                return ResponseEntity.badRequest().body("❌ Product folder not found: " + folderName);
+                return ResponseEntity.badRequest().body(" Product folder not found: " + folderName);
             }
 
             return ResponseEntity.ok("✔ Product deleted successfully: " + folderName);
 
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("❌ Error deleting product: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(" Error deleting product: " + e.getMessage());
         }
     }
 
@@ -84,14 +84,14 @@ public class ProductController {
             boolean success = productService.editProduct(folderName, updatedData, image);
 
             if (!success) {
-                return ResponseEntity.badRequest().body("❌ Product folder not found: " + folderName);
+                return ResponseEntity.badRequest().body(" Product folder not found: " + folderName);
             }
 
             return ResponseEntity.ok("✔ Product updated successfully: " + folderName);
 
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.internalServerError().body("❌ Error updating product: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(" Error updating product: " + e.getMessage());
         }
     }
     @GetMapping("/search")
@@ -100,7 +100,7 @@ public class ProductController {
             List<Map<String, Object>> result = productService.searchProducts(name);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("❌ Error searching: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(" Error searching: " + e.getMessage());
         }
     }
 
