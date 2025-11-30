@@ -11,6 +11,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @CrossOrigin(origins = "http://localhost:3000")
 @RestController
@@ -23,30 +24,26 @@ public class ProductController {
     // ========== UPLOAD PRODUCTS ========== //
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadProducts(
-            @RequestPart("data") String productDataJson,   // <-- JSON String হিসেবে নাও
-            @RequestPart("images") List<MultipartFile> images
-    ) throws Exception {
+            @RequestPart("data") String productDataJson,
+            @RequestPart("images") List<MultipartFile> images) {
 
-        // JSON String কে List<ProductRequest> তে convert করো
-        ObjectMapper mapper = new ObjectMapper();
-        List<ProductRequest> productData = Arrays.asList(
-                mapper.readValue(productDataJson, ProductRequest[].class)
-        );
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            List<ProductRequest> productData = Arrays.asList(
+                    mapper.readValue(productDataJson, ProductRequest[].class)
+            );
 
-        // Validation
-        if (productData == null || images == null) {
-            return ResponseEntity.badRequest().body("❌ data বা images পাওয়া যায়নি!");
+            productService.saveProducts(productData, images);
+
+            return ResponseEntity.ok("✔ Products uploaded successfully!");
+
+        } catch (RuntimeException dupEx) {
+            return ResponseEntity.badRequest().body(dupEx.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("❌ Error: " + e.getMessage());
         }
-
-        if (productData.size() != images.size()) {
-            return ResponseEntity.badRequest()
-                    .body("❌ data JSON এবং images সংখ্যায় সমান হতে হবে!");
-        }
-
-        productService.saveProducts(productData, images);
-
-        return ResponseEntity.ok("✔ " + images.size() + " পণ্য সফলভাবে আপলোড হয়েছে!");
     }
+
 
     // ========== GET ALL PRODUCTS ========== //
     @GetMapping("/list")
@@ -97,5 +94,15 @@ public class ProductController {
             return ResponseEntity.internalServerError().body("❌ Error updating product: " + e.getMessage());
         }
     }
+    @GetMapping("/search")
+    public ResponseEntity<?> searchProducts(@RequestParam("name") String name) {
+        try {
+            List<Map<String, Object>> result = productService.searchProducts(name);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("❌ Error searching: " + e.getMessage());
+        }
+    }
+
 
 }

@@ -35,7 +35,8 @@ export default function Home() {
   const pageSize = 6;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // ------------ EDIT STATES ------------- //
+  const [searchText, setSearchText] = useState("");
+
   const [editModal, setEditModal] = useState(false);
   const [editProductData, setEditProductData] = useState<Product>({
     name: "",
@@ -45,7 +46,6 @@ export default function Home() {
   const [editFolderName, setEditFolderName] = useState<string>("");
   const [editImage, setEditImage] = useState<File | null>(null);
 
-  // ADD ROW
   const addRow = () => {
     setProducts([...products, { name: "", description: "", price: 0 }]);
     setValidation([...validation, { name: true, price: true, description: true }]);
@@ -83,7 +83,9 @@ export default function Home() {
     setImages(e.target.files);
   };
 
-  // UPLOAD PRODUCTS
+  // ---------------------------------------------------
+  // UPLOAD PRODUCTS (DUPLICATE ALERT ADDED HERE)
+  // ---------------------------------------------------
   const handleUpload = async () => {
     if (!images) return alert("Please select images!");
     if (images.length !== products.length)
@@ -93,28 +95,16 @@ export default function Home() {
     const valUpdated = [...validation];
 
     products.forEach((p, i) => {
-      if (!p.name.trim()) {
-        valUpdated[i].name = false;
-        valid = false;
-      }
-      if (p.price <= 0) {
-        valUpdated[i].price = false;
-        valid = false;
-      }
-      if (!p.description.trim()) {
-        valUpdated[i].description = false;
-        valid = false;
-      }
+      if (!p.name.trim()) { valUpdated[i].name = false; valid = false; }
+      if (p.price <= 0) { valUpdated[i].price = false; valid = false; }
+      if (!p.description.trim()) { valUpdated[i].description = false; valid = false; }
     });
 
     setValidation(valUpdated);
     if (!valid) return alert("Fill required fields!");
 
     const formData = new FormData();
-    formData.append(
-      "data",
-      new Blob([JSON.stringify(products)], { type: "application/json" })
-    );
+    formData.append("data", new Blob([JSON.stringify(products)], { type: "application/json" }));
 
     Array.from(images).forEach((file) => formData.append("images", file));
 
@@ -136,24 +126,49 @@ export default function Home() {
       if (fileInputRef.current) fileInputRef.current.value = "";
 
       loadProducts();
-    } catch (err) {
+
+    } catch (err: any) {
       console.error(err);
-      alert("Upload failed!");
+
+      // ------------------ DUPLICATE ALERT ------------------
+      if (err.response && err.response.data) {
+        alert(err.response.data); // backend duplicate message
+      } else {
+        alert("Upload failed!");
+      }
+      // -------------------------------------------------------
+
     } finally {
       setLoading(false);
       setUploadProgress(0);
     }
   };
 
-  // LOAD PRODUCT LIST
   const loadProducts = async () => {
     try {
       const res = await axios.get("http://localhost:8080/api/products/list");
       setProductList(res.data);
       setPage(1);
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert("Failed to load products!");
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchText.trim()) {
+      loadProducts();
+      return;
+    }
+
+    try {
+      const res = await axios.get("http://localhost:8080/api/products/search", {
+        params: { name: searchText },
+      });
+
+      setProductList(res.data);
+      setPage(1);
+    } catch {
+      alert("Search failed!");
     }
   };
 
@@ -167,24 +182,20 @@ export default function Home() {
       await axios.delete(`http://localhost:8080/api/products/delete/${folder}`);
       alert("Deleted!");
       loadProducts();
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert("Delete failed!");
     }
   };
 
-  // OPEN EDIT MODAL
   const openEditModal = (p: Product) => {
     setEditProductData(p);
     setEditFolderName(p.imageUrl!.split("/")[0]);
     setEditModal(true);
   };
 
-  // EDIT PRODUCT
   const saveEditedProduct = async () => {
     const formData = new FormData();
     formData.append("data", JSON.stringify(editProductData));
-
     if (editImage) formData.append("image", editImage);
 
     try {
@@ -198,13 +209,11 @@ export default function Home() {
       setEditModal(false);
       setEditImage(null);
       loadProducts();
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert("Update failed!");
     }
   };
 
-  // LOAD ON MOUNT
   useEffect(() => {
     loadProducts();
   }, []);
@@ -213,150 +222,130 @@ export default function Home() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto font-sans">
+      <h1 className="text-5xl font-bold text-center mb-10">Bulk Product Management</h1>
 
-      {/* HEADER TITLE */}
-      <h1 className="text-5xl font-bold text-center text-gray-900 mb-12 animate-fadeIn">
-         Bulk Product Management
-      </h1>
-
-      {/* ADD PRODUCTS SECTION */}
-      <div className="bg-white/60 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-white/30 animate-slideUp">
-        <h2 className="text-xl font-semibold mb-6 text-gray-900">
-          Add New Products
-        </h2>
+      {/* ------------------ ADD SECTION ------------------ */}
+      <div className="bg-white p-7 rounded-xl shadow">
+        <h2 className="text-xl font-semibold mb-4">Add New Products</h2>
 
         <div className="space-y-6">
           {products.map((item, index) => (
-            <div
-              key={index}
-              className="p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl shadow hover:shadow-lg transition relative animate-fadeIn"
-            >
-              <h3 className="font-semibold text-lg mb-4 text-gray-800">
-                Product {index + 1}
-              </h3>
-
+            <div key={index} className="p-6 bg-gray-100 rounded-lg shadow relative">
               {products.length > 1 && (
                 <button
                   onClick={() => removeRow(index)}
-                  className="absolute top-4 right-4 text-white bg-red-600 px-3 py-1 rounded-lg shadow hover:bg-red-700 transition"
+                  className="absolute top-3 right-3 bg-red-600 text-white px-3 py-1 rounded"
                 >
                   Remove
                 </button>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input
                   type="text"
                   placeholder="Product Name"
-                  className={`border p-3 rounded-lg shadow-sm ${
-                    !validation[index].name ? "border-red-500" : "border-gray-300"
-                  }`}
                   value={item.name}
                   onChange={(e) => handleChange(index, "name", e.target.value)}
+                  className={`border p-3 rounded ${!validation[index].name && "border-red-500"}`}
                 />
 
                 <input
                   type="number"
                   placeholder="Price"
-                  className={`border p-3 rounded-lg shadow-sm ${
-                    !validation[index].price ? "border-red-500" : "border-gray-300"
-                  }`}
                   value={item.price}
                   onChange={(e) => handleChange(index, "price", e.target.value)}
+                  className={`border p-3 rounded ${!validation[index].price && "border-red-500"}`}
                 />
 
                 <textarea
                   placeholder="Description"
-                  className={`border p-3 rounded-lg shadow-sm ${
-                    !validation[index].description
-                      ? "border-red-500"
-                      : "border-gray-300"
-                  }`}
                   value={item.description}
-                  onChange={(e) =>
-                    handleChange(index, "description", e.target.value)
-                  }
+                  onChange={(e) => handleChange(index, "description", e.target.value)}
+                  className={`border p-3 rounded ${!validation[index].description && "border-red-500"}`}
                 />
               </div>
             </div>
           ))}
 
-          <button
-            onClick={addRow}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-700 transition font-semibold"
-          >
+          <button onClick={addRow} className="bg-blue-600 text-white px-6 py-3 rounded-lg">
             + Add Another Product
           </button>
         </div>
       </div>
 
-      {/* UPLOAD IMAGES */}
-      <div className="mt-10 bg-white/60 backdrop-blur-xl shadow-xl rounded-2xl p-8 border border-white/30 animate-slideUp">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900">
-          Upload Product Images
-        </h2>
+      {/* ------------------ UPLOAD SECTION ------------------ */}
+      <div className="mt-8 bg-white p-7 rounded-xl shadow">
+        <h2 className="text-xl font-semibold mb-3">Upload Product Images</h2>
 
-        <input
-          type="file"
-          multiple
-          className="mb-4"
-          onChange={handleImages}
-          ref={fileInputRef}
-        />
+        <input type="file" multiple onChange={handleImages} ref={fileInputRef} />
 
         {uploadProgress > 0 && (
-          <div className="w-full bg-gray-200 h-3 rounded-full overflow-hidden">
-            <div
-              className="bg-green-600 h-3 rounded-full transition-all"
-              style={{ width: `${uploadProgress}%` }}
-            />
+          <div className="w-full bg-gray-200 h-3 mt-2 rounded">
+            <div className="bg-green-600 h-3" style={{ width: `${uploadProgress}%` }} />
           </div>
         )}
 
         <button
           onClick={handleUpload}
-          className="mt-4 bg-green-600 text-white px-7 py-3 rounded-lg shadow hover:bg-green-700 transition font-semibold"
+          className="mt-4 bg-green-600 text-white px-6 py-3 rounded-lg"
         >
           {loading ? "Uploading..." : "Upload Products"}
         </button>
       </div>
 
-      {/* PRODUCT LIST */}
-      <h2 className="text-3xl font-bold mt-14 mb-6 text-gray-900 animate-fadeIn">
-        Uploaded Products
-      </h2>
+      {/* ------------------ PRODUCT LIST ------------------ */}
+      <h2 className="text-3xl font-bold mt-14 mb-4">Uploaded Products</h2>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 animate-fadeIn">
-        {paginated.map((p) => (
-          <div
-            key={p.id}
-            className="bg-white/70 backdrop-blur-xl p-6 rounded-2xl shadow-lg border hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300"
-          >
+      <div className="flex items-center gap-3 mb-6">
+        <input
+          type="text"
+          placeholder="Search by product name..."
+          className="border p-3 rounded-xl shadow w-80"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+        />
+
+        <button
+          onClick={handleSearch}
+          className="bg-blue-600 text-white px-5 py-3 rounded-xl shadow"
+        >
+          Search
+        </button>
+
+        <button
+          onClick={() => { setSearchText(""); loadProducts(); }}
+          className="bg-gray-500 text-white px-5 py-3 rounded-xl shadow"
+        >
+          Reset
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {paginated.map((p, i) => (
+          <div key={i} className="bg-white p-5 rounded-lg shadow">
             {p.imageUrl && (
               <img
                 src={`http://localhost:8080/${p.imageUrl}`}
-                className="w-full h-48 object-cover rounded-xl cursor-pointer hover:opacity-90 transition"
-                onClick={() =>
-                  setFullscreenImage(`http://localhost:8080/${p.imageUrl}`)
-                }
+                className="w-full h-48 object-cover rounded cursor-pointer"
+                onClick={() => setFullscreenImage(`http://localhost:8080/${p.imageUrl}`)}
               />
             )}
 
-            <h3 className="text-xl font-semibold mt-4">{p.name}</h3>
-            <p className="text-gray-600">{p.description}</p>
+            <h3 className="text-xl font-semibold mt-3">{p.name}</h3>
+            <p>{p.description}</p>
             <p className="font-bold text-green-700">${p.price}</p>
 
-            <div className="mt-5 flex gap-3">
+            <div className="mt-4 flex gap-3">
               <button
                 onClick={() => openEditModal(p)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition"
+                className="bg-blue-600 text-white px-4 py-2 rounded"
               >
                 Edit
               </button>
 
               <button
                 onClick={() => handleDelete(p.imageUrl)}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg shadow hover:bg-red-700 transition"
+                className="bg-red-600 text-white px-4 py-2 rounded"
               >
                 Delete
               </button>
@@ -365,50 +354,35 @@ export default function Home() {
         ))}
       </div>
 
-      {/* PAGINATION */}
-      <div className="flex justify-center items-center mt-10 gap-4 animate-fadeIn">
-
-        {/* Previous Button */}
+      {/* ------------------ PAGINATION ------------------ */}
+      <div className="flex justify-center items-center mt-8 gap-3">
         <button
           onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
           disabled={page === 1}
-          className={`px-5 py-2 rounded-lg shadow transition 
-            ${page === 1 
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed" 
-              : "bg-blue-600 text-white hover:bg-blue-700"
-            }`}
+          className="px-4 py-2 bg-blue-600 text-white rounded disabled:bg-gray-400"
         >
-          ← Previous
+          Previous
         </button>
 
-        {/* Page number */}
-        <span className="px-5 py-2 bg-white/70 backdrop-blur-xl rounded-lg shadow font-semibold text-gray-800">
-          Page {page} of {Math.ceil(productList.length / pageSize)}
-        </span>
+        <span>Page {page} of {Math.ceil(productList.length / pageSize)}</span>
 
-        {/* Next Button */}
         <button
           onClick={() =>
-            setPage((prev) => 
+            setPage((prev) =>
               prev < Math.ceil(productList.length / pageSize) ? prev + 1 : prev
             )
           }
           disabled={page >= Math.ceil(productList.length / pageSize)}
-          className={`px-5 py-2 rounded-lg shadow transition 
-            ${page >= Math.ceil(productList.length / pageSize)
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed" 
-              : "bg-blue-600 text-white hover:bg-blue-700"
-            }`}
+          className="px-4 py-2 bg-blue-600 text-white rounded disabled:bg-gray-400"
         >
-          Next →
+          Next
         </button>
-
       </div>
 
-      {/* EDIT MODAL */}
+      {/* ------------------ EDIT MODAL ------------------ */}
       {editModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center animate-fadeIn">
-          <div className="bg-white p-8 rounded-2xl w/full max-w-lg shadow-xl scale-100 animate-zoomIn">
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+          <div className="bg-white p-8 rounded-xl w-full max-w-lg">
             <h2 className="text-2xl font-bold mb-5">Edit Product</h2>
 
             <input
@@ -423,10 +397,7 @@ export default function Home() {
             <textarea
               value={editProductData.description}
               onChange={(e) =>
-                setEditProductData({
-                  ...editProductData,
-                  description: e.target.value,
-                })
+                setEditProductData({ ...editProductData, description: e.target.value })
               }
               className="w-full border p-3 rounded mb-3"
             />
@@ -435,15 +406,12 @@ export default function Home() {
               type="number"
               value={editProductData.price}
               onChange={(e) =>
-                setEditProductData({
-                  ...editProductData,
-                  price: Number(e.target.value),
-                })
+                setEditProductData({ ...editProductData, price: Number(e.target.value) })
               }
               className="w-full border p-3 rounded mb-3"
             />
 
-            <label className="font-semibold">Replace Image (optional):</label>
+            <label>Replace Image (optional):</label>
             <input
               type="file"
               className="w-full mt-2"
@@ -469,16 +437,13 @@ export default function Home() {
         </div>
       )}
 
-      {/* FULLSCREEN IMAGE */}
+      {/* ------------------ FULLSCREEN IMAGE ------------------ */}
       {fullscreenImage && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center animate-fadeIn"
+          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center"
           onClick={() => setFullscreenImage(null)}
         >
-          <img
-            src={fullscreenImage}
-            className="max-w-[90%] max-h-[90%] rounded-xl animate-zoomIn"
-          />
+          <img src={fullscreenImage} className="max-w-[90%] max-h-[90%] rounded" />
         </div>
       )}
     </div>

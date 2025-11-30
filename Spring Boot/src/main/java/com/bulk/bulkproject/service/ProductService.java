@@ -19,39 +19,49 @@ public class ProductService {
 
     public void saveProducts(List<ProductRequest> productData, List<MultipartFile> images) throws Exception {
 
-        // Ensure root storage directory exists
+        // Ensure root storage exists
         File rootDir = new File(storagePath);
-        if (!rootDir.exists()) {
-            boolean created = rootDir.mkdirs();
-            if (!created) throw new RuntimeException("Failed to create root storage folder: " + rootDir.getAbsolutePath());
-        }
+        if (!rootDir.exists()) rootDir.mkdirs();
+
+        // 🔍 FIRST LOAD ALL EXISTING PRODUCTS
+        List<Map<String, Object>> existingProducts = getAllProducts();
 
         for (int i = 0; i < images.size(); i++) {
             ProductRequest data = productData.get(i);
-            MultipartFile image = images.get(i);
 
+            // ------------------------------
+            // 🔥 DUPLICATE CHECK START
+            // ------------------------------
+            boolean duplicateFound = existingProducts.stream().anyMatch(p ->
+                    p.get("name").toString().equalsIgnoreCase(data.getName()) &&
+                            p.get("description").toString().equalsIgnoreCase(data.getDescription())
+            );
+
+            if (duplicateFound) {
+                throw new RuntimeException(
+                        "❌ Duplicate product found: " + data.getName() + " (" + data.getDescription() + ")"
+                );
+            }
+            // ------------------------------
+            // 🔥 DUPLICATE CHECK END
+            // ------------------------------
+
+            MultipartFile image = images.get(i);
             if (image.isEmpty()) {
                 throw new RuntimeException("Image file is empty for product: " + data.getName());
             }
 
-            // Create unique product folder
             String folderName = "product_" + UUID.randomUUID();
             File productDir = new File(rootDir, folderName);
+            productDir.mkdirs();
 
-            if (!productDir.exists()) {
-                boolean created = productDir.mkdirs();
-                if (!created) throw new RuntimeException("Failed to create product folder: " + productDir.getAbsolutePath());
-            }
-
-            // Save image file
+            // Save image
             String imageName = image.getOriginalFilename();
             File imageFile = new File(productDir, imageName);
             image.transferTo(imageFile);
 
-            // Generate image URL for frontend
-            String imageUrl =  folderName + "/" + imageName;
+            String imageUrl = folderName + "/" + imageName;
 
-            // Save product JSON
             Map<String, Object> json = new HashMap<>();
             json.put("name", data.getName());
             json.put("description", data.getDescription());
@@ -60,13 +70,9 @@ public class ProductService {
 
             File jsonFile = new File(productDir, "product.json");
             mapper.writeValue(jsonFile, json);
-
-            // Debug logs
-            System.out.println("Saved product folder: " + productDir.getAbsolutePath());
-            System.out.println("Saved image: " + imageFile.getAbsolutePath());
-            System.out.println("Saved JSON: " + jsonFile.getAbsolutePath());
         }
     }
+
 
     public List<Map<String, Object>> getAllProducts() throws Exception {
         List<Map<String, Object>> products = new ArrayList<>();
@@ -156,6 +162,32 @@ public class ProductService {
 
         return true;
     }
+    public List<Map<String, Object>> searchProducts(String keyword) throws Exception {
+        List<Map<String, Object>> products = new ArrayList<>();
+        File root = new File(storagePath);
+
+        if (!root.exists()) return products;
+
+        for (File folder : root.listFiles()) {
+            if (folder.isDirectory()) {
+                File jsonFile = new File(folder, "product.json");
+
+                if (jsonFile.exists()) {
+                    Map<String, Object> product = mapper.readValue(jsonFile, Map.class);
+
+                    String name = product.get("name").toString().toLowerCase();
+                    String keywordLower = keyword.toLowerCase();
+
+                    // 🔍 Partial match: contains, startsWith, endsWith সব কাজ করবে
+                    if (name.contains(keywordLower)) {
+                        products.add(product);
+                    }
+                }
+            }
+        }
+        return products;
+    }
+
 
 
 }
