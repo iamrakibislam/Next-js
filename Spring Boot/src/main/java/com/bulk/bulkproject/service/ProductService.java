@@ -30,7 +30,7 @@ public class ProductService {
             ProductRequest data = productData.get(i);
 
             // ------------------------------
-            // 🔥 DUPLICATE CHECK START
+            //  DUPLICATE CHECK START
             // ------------------------------
             boolean duplicateFound = existingProducts.stream().anyMatch(p ->
                     p.get("name").toString().equalsIgnoreCase(data.getName()) &&
